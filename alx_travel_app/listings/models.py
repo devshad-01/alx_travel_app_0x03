@@ -51,4 +51,50 @@ class Review(models.Model):
         ordering = ['-created_at']
         
     def __str__(self):
-        return f'{self.reviewer.username} - {self.listing.title} ({self.rating}/5)'
+        return f'{self.reviewer.username} - {self.listing.title} ({self.rating} stars)'
+
+
+class Booking(models.Model):
+    """Booking model for travel listings"""
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('cancelled', 'Cancelled'),
+        ('completed', 'Completed'),
+    ]
+    
+    listing = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='bookings')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
+    check_in_date = models.DateField()
+    check_out_date = models.DateField()
+    number_of_guests = models.PositiveIntegerField(default=1)
+    total_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    special_requests = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(check_out_date__gt=models.F('check_in_date')),
+                name='check_out_after_check_in'
+            ),
+            models.CheckConstraint(
+                check=models.Q(number_of_guests__gte=1),
+                name='minimum_one_guest'
+            ),
+            models.CheckConstraint(
+                check=models.Q(total_price__gte=0),
+                name='non_negative_price'
+            ),
+        ]
+        
+    def __str__(self):
+        return f'{self.user.username} - {self.listing.title} ({self.check_in_date} to {self.check_out_date})'
+    
+    def duration_days(self):
+        """Calculate the duration of the booking in days"""
+        return (self.check_out_date - self.check_in_date).days

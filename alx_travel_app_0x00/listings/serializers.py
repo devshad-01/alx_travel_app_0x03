@@ -60,19 +60,18 @@ class ListingCreateSerializer(serializers.ModelSerializer):
 
 class BookingSerializer(serializers.ModelSerializer):
     """Booking serializer"""
-    user = UserSerializer(read_only=True)
-    listing = serializers.PrimaryKeyRelatedField(queryset=Listing.objects.all())
-    listing_details = ListingSerializer(source='listing', read_only=True)
-    duration_days = serializers.ReadOnlyField()
+    guest = UserSerializer(read_only=True)
+    listing = serializers.StringRelatedField(read_only=True)
+    listing_id = serializers.IntegerField(write_only=True)
     
     class Meta:
         model = Booking
         fields = [
-            'id', 'listing', 'listing_details', 'user', 'check_in_date', 
-            'check_out_date', 'number_of_guests', 'total_price', 'status',
-            'special_requests', 'created_at', 'updated_at', 'duration_days'
+            'id', 'listing', 'listing_id', 'guest', 'check_in_date', 
+            'check_out_date', 'guests_count', 'total_price', 'status', 
+            'booking_date', 'updated_at'
         ]
-        read_only_fields = ['id', 'user', 'created_at', 'updated_at', 'duration_days']
+        read_only_fields = ['id', 'guest', 'booking_date', 'updated_at']
     
     def validate(self, data):
         """Validate booking data"""
@@ -80,16 +79,20 @@ class BookingSerializer(serializers.ModelSerializer):
         check_out = data.get('check_out_date')
         
         if check_in and check_out:
-            if check_out <= check_in:
+            if check_in >= check_out:
                 raise serializers.ValidationError(
                     "Check-out date must be after check-in date."
                 )
-            
-            # Check if check-in is not in the past
-            from django.utils import timezone
-            if check_in < timezone.now().date():
-                raise serializers.ValidationError(
-                    "Check-in date cannot be in the past."
-                )
         
         return data
+
+
+class BookingCreateSerializer(serializers.ModelSerializer):
+    """Simplified serializer for creating bookings"""
+    
+    class Meta:
+        model = Booking
+        fields = [
+            'listing', 'check_in_date', 'check_out_date', 
+            'guests_count', 'total_price'
+        ]

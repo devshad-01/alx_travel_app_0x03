@@ -8,8 +8,7 @@ This is a Django REST API project for a travel application with the following fe
 - **MySQL** database integration
 - **Swagger/OpenAPI** documentation
 - **Celery** for background tasks
-- **Redis** as message broker
-- **CORS** support for frontend integration
+- **Redis** as message broker- **CORS** support for frontend integration
 - **Environment-based configuration**
 
 ## 🏗️ Project Structure

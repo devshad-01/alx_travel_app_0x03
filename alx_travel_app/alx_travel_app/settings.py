@@ -64,7 +64,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'django_filters',
     # Local apps
-    'alx_travel_app.listings',
+    'listings',
 ]
 
 MIDDLEWARE = [

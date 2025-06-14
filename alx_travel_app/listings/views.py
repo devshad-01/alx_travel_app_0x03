@@ -5,11 +5,12 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from .models import Listing, Review
+from .models import Listing, Review, Booking
 from .serializers import (
     ListingSerializer, 
     ListingCreateSerializer, 
-    ReviewSerializer
+    ReviewSerializer,
+    BookingSerializer
 )
 
 
@@ -95,3 +96,24 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set the reviewer when creating a review"""
         serializer.save(reviewer=self.request.user)
+
+
+class BookingViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing bookings.
+    
+    Users can only view and modify their own bookings.
+    """
+    serializer_class = BookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
+    filterset_fields = ['status', 'listing']
+    ordering = ['-created_at']
+    
+    def get_queryset(self):
+        """Filter bookings to show only user's own bookings"""
+        return Booking.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        """Set the user when creating a booking"""
+        serializer.save(user=self.request.user)
