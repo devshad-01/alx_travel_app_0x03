@@ -98,3 +98,21 @@ class Booking(models.Model):
     def duration_days(self):
         """Calculate the duration of the booking in days"""
         return (self.check_out_date - self.check_in_date).days
+
+
+class Payment(models.Model):
+    """Model to store payment-related information for bookings."""
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name="payment")
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    transaction_id = models.CharField(max_length=100, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Payment for {self.booking} - {self.status}"

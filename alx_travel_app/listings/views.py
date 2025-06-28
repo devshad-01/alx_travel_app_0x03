@@ -5,13 +5,18 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
-from .models import Listing, Review, Booking
+from .models import Listing, Review, Booking, Payment
 from .serializers import (
     ListingSerializer, 
     ListingCreateSerializer, 
     ReviewSerializer,
-    BookingSerializer
+    BookingSerializer,
+    PaymentSerializer
 )
+import os
+import requests
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
 
 
 class ListingViewSet(viewsets.ModelViewSet):
@@ -117,3 +122,63 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """Set the user when creating a booking"""
         serializer.save(user=self.request.user)
+
+
+class PaymentInitiateView(APIView):
+    """Initiate payment with Chapa API."""
+    def post(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id, user=request.user)
+        chapa_key = os.environ.get('CHAPA_SECRET_KEY')
+        if not chapa_key:
+            return Response({'error': 'Chapa secret key not configured.'}, status=500)
+        data = {
+            "amount": str(booking.total_price),
+            "currency": "ETB",
+            "email": request.user.email,
+            "first_name": request.user.first_name,
+            "last_name": request.user.last_name,
+            "tx_ref": f"booking_{booking.id}_{request.user.id}",
+            "return_url": request.build_absolute_uri(f"/api/payments/verify/{booking.id}/"),
+        }
+        headers = {"Authorization": f"Bearer {chapa_key}"}
+        response = requests.post("https://api.chapa.co/v1/transaction/initialize", json=data, headers=headers)
+        if response.status_code == 200:
+            resp_data = response.json()
+            tx_id = resp_data['data']['tx_ref']
+            payment, created = Payment.objects.get_or_create(
+                booking=booking,
+                defaults={
+                    'amount': booking.total_price,
+                    'transaction_id': tx_id,
+                    'status': 'pending',
+                }
+            )
+            return Response({
+                'checkout_url': resp_data['data']['checkout_url'],
+                'transaction_id': tx_id
+            })
+        return Response({'error': 'Failed to initiate payment.'}, status=400)
+
+
+class PaymentVerifyView(APIView):
+    """Verify payment status with Chapa API."""
+    def get(self, request, booking_id):
+        payment = get_object_or_404(Payment, booking_id=booking_id)
+        chapa_key = os.environ.get('CHAPA_SECRET_KEY')
+        if not chapa_key:
+            return Response({'error': 'Chapa secret key not configured.'}, status=500)
+        url = f"https://api.chapa.co/v1/transaction/verify/{payment.transaction_id}"
+        headers = {"Authorization": f"Bearer {chapa_key}"}
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            resp_data = response.json()
+            status_val = resp_data['data']['status']
+            if status_val == 'success':
+                payment.status = 'completed'
+                payment.save()
+                # TODO: trigger Celery task to send confirmation email
+            elif status_val == 'failed':
+                payment.status = 'failed'
+                payment.save()
+            return Response({'status': payment.status})
+        return Response({'error': 'Failed to verify payment.'}, status=400)

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Listing, Review, Booking
+from .models import Listing, Review, Booking, Payment
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -93,3 +93,12 @@ class BookingSerializer(serializers.ModelSerializer):
                 )
         
         return data
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Payment serializer"""
+    
+    class Meta:
+        model = Payment
+        fields = ['id', 'booking', 'amount', 'transaction_id', 'status', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'transaction_id', 'status', 'created_at', 'updated_at']
